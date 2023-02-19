@@ -1,0 +1,43 @@
+#!/bin/bash
+
+# a simple script to send an email any time my IP Addresss
+# changes using curl.  This is useful so you don't lose the 
+# ability to ssh into your destination machine (work, home, etc)
+# Not all email providers allow sending emails VIA curl.  YMMV.
+
+set -e
+
+CURRENTIP=$(wget http://ipinfo.io/ip -qO -)
+DATE=$(date)
+SMTP="smtp://smtp.office365.com:587"
+SENDER="youremail@whereever.com" # the email address that will send the email
+RECIEVER="youremail@destination.com" # where you want to receive the email
+PASSWORD="XXXXXXXX" # your email password
+
+# If doesn't exsist, store the current IP for future comparisons
+if [ ! -f /root/Documents/ip.txt ] ; then
+  echo $CURRENTIP > /root/Documents/ip.txt
+fi
+
+if [ $CURRENTIP != $(cat /root/Documents/ip.txt) ] ; then
+cat <<_EOT_ > /root/Documents/newip.txt
+From: Me <$SENDER>
+To: Me <$RECIEVER>
+Subject: IP change detected
+Date: $DATE
+
+$DATE
+
+Your new IP is: $CURRENTIP
+_EOT_
+
+	curl \
+	--url $SMTP  \
+	--ssl-reqd \
+	--mail-from $SENDER \
+	--mail-rcpt $RECIEVER \
+	--upload-file /root/Documents/newip.txt \
+	--user $SENDER:$PASSWORD
+
+	echo $CURRENTIP > /root/Documents/ip.txt
+fi

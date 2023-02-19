@@ -1,0 +1,34 @@
+#!/bin/sh
+
+SYSFILE=/sys/kernel/debug/sched/preempt
+
+function show_preempt_mode()
+{
+  local PREEMPT_MODE=$(cat $SYSFILE | sed -r "s/^.*\((.*)\).*?$/\1/g")
+
+  echo "Dynamic Preempt: ${PREEMPT_MODE}"
+}
+
+if [ ! -e $SYSFILE ]; then
+  echo "${SYSFILE} not found?"
+  exit 1
+elif [ $# -ge 1 ]; then
+  echo "Usage: $(basename $0) <method> ..."
+  exit 1
+elif [ $# -eq 0 ]; then
+  show_preempt_mode
+  exit 0
+fi
+
+PREEMPT_MODE="$1"
+
+# Sanity check:
+if ! echo $PREEMPT_MODE | grep -wq -e none -e voluntary -e full ; then
+  echo "ERROR: Invalid mode for Dynamic Preempt: $PREEMPT_MODE"
+  exit 1
+fi
+
+echo "$PREEMPT_MODE" > $SYSFILE
+
+show_preempt_mode
+exit 0

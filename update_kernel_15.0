@@ -1,0 +1,136 @@
+#!/bin/bash
+
+# Copyright 2021 Matt Dinslage (daedra1980@gmail.com), Springfield, MO, USA
+# All rights reserved.
+#
+# Redistribution and use of this script, with or without modification, is
+# permitted provided that the following conditions are met:
+#
+# 1. Redistributions of this script must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR IMPLIED
+#  WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+#  MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO
+#  EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+#  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+#  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+#  OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+#  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+#  OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+#  ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+set -e
+
+# Run as root only
+if [ "$EUID" -ne 0 ] ; then
+  echo "Please run as root"
+  exit
+fi
+
+if [ -z "$ARCH" ]; then
+  case "$( uname -m )" in
+    i?86) ARCH=i586 ;;
+    arm*) ARCH=arm ;;
+       *) ARCH=$( uname -m ) ;;
+  esac
+fi
+
+if [ "$ARCH" = "i586" ]; then
+  ARCHSUFFIX=""
+  SMP="-smp"
+elif [ "$ARCH" = "i686" ]; then
+  ARCHSUFFIX=""
+  SMP="-smp"
+elif [ "$ARCH" = "x86_64" ]; then
+  ARCHSUFFIX="64"
+  SMP=""
+fi
+
+CHANGELOG="https://slackware.osuosl.org/slackware${ARCHSUFFIX}-15.0/ChangeLog.txt"
+OLD_KERNEL=$(find /var/lib/pkgtools/packages/ -iname "*kernel-source*" | tail -n1 | cut -d/ -f6 | cut -c15-21)
+NEW_KERNEL=$(wget -O- -q "$CHANGELOG" | grep linux-5.15 | head -n1 | cut -d/ -f3 | cut -d- -f2)
+PATCHES="https://slackware.osuosl.org/slackware${ARCHSUFFIX}-15.0/patches/packages"
+MD5SUM="https://slackware.osuosl.org/slackware${ARCHSUFFIX}-15.0/patches/CHECKSUMS.md5"
+
+if [ "$OLD_KERNEL" = "$NEW_KERNEL" ] ; then
+  echo "Latest kernel already installed"
+  exit 1
+fi
+
+# create temporary directories
+TMP=${TMP:-/tmp/linux-$NEW_KERNEL${SMP}}
+rm -rf "$TMP"
+mkdir "$TMP"
+cd "$TMP"
+
+echo ""
+echo -e "\e[1;32m ###          \e[0m"
+echo -e "\e[1;32m ### Kernel update available, downloading new kernel packages... \e[0m"
+echo -e "\e[1;32m ###          \e[0m"
+echo ""
+sleep 1
+
+# grab new kernel packages
+wget -r -np -nd -l1 --accept=*.t?z "$PATCHES"/linux-"$NEW_KERNEL"
+
+echo ""
+echo -e "\e[1;32m ###          \e[0m"
+echo -e "\e[1;32m ### Verify Checksums\e[0m"
+echo -e "\e[1;32m ###          \e[0m"
+echo ""
+sleep 1
+
+# check md5sum of packages 
+for k in *.t?z ; do
+  if [ "$(wget -O- -q "$MD5SUM" | grep "$k" | head -n1 | cut -d" " -f1)" == "$(md5sum "$k" | cut -d" " -f1)" ] ; then
+	echo -e "$k md5sum... \e[1;32m verified\e[0m"
+  else
+	echo -e "$k md5sum mismatch... \e[1;31m aborting\e[0m" 
+	exit 1
+  fi
+done
+
+echo ""
+echo -e "\e[1;32m ###          \e[0m"
+echo -e "\e[1;32m ### Upgrade kernel packages but don't replace original modules package\e[0m"
+echo -e "\e[1;32m ###          \e[0m"
+echo ""
+sleep 1 
+
+# remove old kernel modules except the 5.15.19 modules that shipped with 15.0
+if [ "$OLD_KERNEL" != 5.15.19 ] ; then
+    find /var/lib/pkgtools/packages/ -type f -iname "*kernel-modules*$OLD_KERNEL*" -exec removepkg {} \;
+fi
+
+# install new kernel-modules
+find ./* -iname "*modules*" -exec installpkg {} \;
+
+# upgrade the kernel
+find ./* ! -iname "*modules*" -exec upgradepkg --reinstall --install-new {} \;
+
+# Create new initramfs
+if [ -f /etc/mkinitrd.conf ] ; then
+  echo -e "\e[1;32m ### /etc/mkinitrd.conf found... use that \e[0m"
+  mkinitrd -F
+else
+  echo -e "\e[1;32m ### /etc/mkinitrd.conf not found... use /usr/share/mkinitrd_command_generator.sh \e[0m"
+  sh /usr/share/mkinitrd/mkinitrd_command_generator.sh -r -k "${NEW_KERNEL}""${SMP}" | bash
+fi
+
+# update grub or lilo
+if [ -f /etc/lilo.conf ] ; then
+  echo -e "\e[1;36m ### LILO Found, using that...\e[0m"
+  lilo -v
+elif [ -f /boot/grub/grub.cfg ] ; then
+  echo -e "\e[1;36m ### Grub Found, using that...\e[0m"
+  grub-mkconfig -o /boot/grub/grub.cfg
+else
+  echo "LILO or Grub not found!"
+  echo "Assuming ELILO or rEFInd, if ELILO, then run eliloconfig or manually update your bootloader before rebooting!"
+fi
+
+echo ""
+echo -e "\e[1;32m ###          \e[0m"
+echo -e "\e[1;32m ### Kernel upgrade finished \e[0m"
+echo -e "\e[1;32m ###          \e[0m"
