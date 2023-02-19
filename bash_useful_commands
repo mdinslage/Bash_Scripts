@@ -1,0 +1,91 @@
+# List Sound Modules
+lsmod | grep ^snd | cut -d' ' -f1
+
+# watch audio output
+watch -n1 cat /proc/asound/card0/pcm0p/sub0/hw_params
+
+# log cpu frequency then sort by lowest to highest
+watch -n.1 "cat /proc/cpuinfo | grep -oP '(?<=MHz\t\t: )\d+\.\d+' | sort | tail -n1 | tee -a output.txt"
+
+# grub 
+grub-mkconfig -o /boot/grub/grub.cfg
+
+# apply all patches in a directory loop
+for patch in $CWD/patches/* ; do
+	patch -p1 < $patch
+done
+
+# get the md5sum of all files in a directory
+md5sum * */* 2>/dev/null > md5sum.md5
+
+# mount an iso
+mount -o loop /path/to/my-iso-image.iso /mnt/iso 
+
+# set slackware packages version from latest git commit
+VERSION=$(git ls-remote https://github.com/JACoders/OpenJK | awk '{print substr($0,0,7)}' | head -n 1)
+
+# run a cron job immediately
+run-parts /etc/cron.daily
+
+# check if cron job ran
+grep -ic cron /var/log/cron* | grep -v :0
+
+# check for open ports.  Any of these will work.
+lsof -i -P -n | grep LISTEN
+netstat -tulpn | grep LISTEN
+ss -tulpn | grep LISTEN
+lsof -i:22 ## see a specific port such as 22 ##
+nmap -sTU -O IP-address-Here
+nmap -n -PN -sT -sU -p- localhost
+
+# generate random strong password
+date +%s | sha256sum | base64 | head -c 16 ; echo
+< /dev/urandom tr -dc _A-Z-a-z-0-9 | head -c${1:-16};echo;
+openssl rand -base64 16
+strings /dev/urandom | grep -o '[[:alnum:]]' | head -n 16 | tr -d '\n'; echo
+
+# findmnt - find a filesystem
+findmnt
+
+# show environment varibles
+env
+
+# show what directories do and hold
+man hier
+
+# find files then show combined total size
+find <directory> -type f -iname '***' -exec du -ch {} + | grep total$
+
+# see size of directory in human form
+du -sbh /var | cut -f1
+
+ls /var/log/packages/*_SBo | cut -d'/' -f5 | rev | cut -d- -f4- | rev
+
+# detect drive if not found during hot swap
+echo 0 0 0 | tee /sys/class/scsi_host/host*/scan
+
+# Count all pages in multiple pfds
+for f in *.pdf; do pdfinfo "$f" | grep Pages | awk '{print $2}'; done
+for i in *.pdf; do pdfinfo  | grep ^Pages:; done | awk '{s+=} END {print s}'
+expr $( echo -n 0; parallel "pdfinfo {} |sed -n 's/Pages: */ + /p'" ::: *PDF|tr '\n' ' ')
+
+# rename files based on patter
+for f in config*; do mv "$f" $(echo "$f" | sed 's/19/58/g'); done
+
+# show size of all files and directories
+du -sk -- * | sort -nr | cut -f2 | xargs du -sh
+
+# batch convert all webp images to png
+parallel dwebp {} -o {.}.png ::: *.webp
+
+# show the device assigened to hwmon number
+for m in /sys/class/hwmon/* ; do echo -n "$m = " ; cat $m/name ; done
+
+# show port numbers of running services
+sudo netstat -tulpn
+
+# list all supported sample rates of soundcard
+grep Rates /proc/asound/card0/stream0 | head -n1 | cut -d" " -f6- | sed 's/,//g'
+
+# bypass pipewire/pulseaudio and use alsa for native sample rate
+mpv --ao=alsa --audio-device=alsa/hw:0,0 
