@@ -68,6 +68,7 @@ echo 0 0 0 | tee /sys/class/scsi_host/host*/scan
 for f in *.pdf; do pdfinfo "$f" | grep Pages | awk '{print $2}'; done
 for i in *.pdf; do pdfinfo  | grep ^Pages:; done | awk '{s+=} END {print s}'
 expr $( echo -n 0; parallel "pdfinfo {} |sed -n 's/Pages: */ + /p'" ::: *PDF|tr '\n' ' ')
+for f in *.pdf; do pdfinfo $f | grep Pages | tr -d 'Pages:' ; done | paste -s -d+ - | bc
 
 # rename files based on patter
 for f in config*; do mv "$f" $(echo "$f" | sed 's/19/58/g'); done
@@ -89,3 +90,6 @@ grep Rates /proc/asound/card0/stream0 | head -n1 | cut -d" " -f6- | sed 's/,//g'
 
 # bypass pipewire/pulseaudio and use alsa for native sample rate
 mpv --ao=alsa --audio-device=alsa/hw:0,0 
+
+# Create unicast MAC Addresses for intel Virtual Function adapters
+od -An -N6 -tx1 /dev/urandom | sed -e 's/^  *//' -e 's/  */:/g' -e 's/:$//' -e 's/^\(.\)[13579bdf]/\10/'
