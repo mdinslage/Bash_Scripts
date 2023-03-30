@@ -20,12 +20,12 @@ fi
 echo 'ACTION=="change",KERNEL=="card0",SUBSYSTEM=="drm",RUN+="/usr/local/bin/x-resize"' > /etc/udev/rules.d/50-x-resize.rules
 
 # Create the x-resize script
-echo '#! /bin/sh
+echo '#! /bin/sh 
 PATH=/usr/bin
 desktopuser=$(/bin/ps -ef  | /bin/grep -oP "^\w+ (?=.*vdagent( |$))") || exit 0
 export DISPLAY=:0
 export XAUTHORITY=$(eval echo "~$desktopuser")/.Xauthority
-xrandr --output $(xrandr | awk "/ connected/{print \$1; exit; }") --auto' | tee /usr/local/bin/x-resize > /dev/null
+xrandr --output $(xrandr | awk "/ connected/{print \$1; exit; }") --auto' > /usr/local/bin/x-resize
 
 # Make file executable
 chmod +x /usr/local/bin/x-resize
