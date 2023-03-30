@@ -33,4 +33,3 @@ chmod +x /usr/local/bin/x-resize
 # Reload the udev rules
 udevadm control --reload-rules
 
-# Your script code goes here
