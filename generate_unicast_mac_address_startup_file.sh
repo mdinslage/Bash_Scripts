@@ -10,14 +10,14 @@ for ((i=1; i<=num_macs; i++)); do
     mac_addresses+=($mac)
 done
 
-formatted_macs=$(printf "\t%s\n" "${mac_addresses[@]}")
+formatted_macs=$(printf "\t%s\n" "${mac_addresses[@]}" | sed 's/^[ \t]*//')
 
 # Create set_mac_address.sh file
 cat <<EOF > set_mac_address.sh
 #!/bin/bash
 
 MACADDRESS1=(
-${formatted_macs}
+$formatted_macs
 );
 
 SLOTS=({0..$((num_macs-1))});
@@ -28,4 +28,3 @@ done
 EOF
 
 echo "set_mac_address.sh file created with $num_macs MAC addresses."
-
