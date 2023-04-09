@@ -1,0 +1,44 @@
+#!/bin/bash
+
+# Download a package source directory from a Slackware mirror.
+
+TMP=${TMP:-/tmp}
+
+# delete the FILE_LIST file
+rm $TMP/FILE_LIST* 2>/dev/null
+
+# Prompt for package name and branch
+echo "Package Name:"
+read PACKAGE
+
+echo "Branch (15.0 or current):"
+read BRANCH
+
+# Download FILE_LIST and check if package is kde
+wget -q https://slackware.osuosl.org/slackware64-$BRANCH/source/FILE_LIST
+
+# kde is a special case
+if [ "$PACKAGE" = "kde" ]; then
+  lftp -c "open https://slackware.osuosl.org/slackware64-$BRANCH/source/ ; mirror kde"
+  exit
+fi
+
+# Check if package has already been downloaded
+if [ -d "$TMP/$PACKAGE" ]; then
+  echo "Package found. Overwrite? (y/n)"
+  read OVERWRITE
+  if [ "$OVERWRITE" = "n" ]; then
+    echo "Exiting script..."
+    exit
+  fi
+  rm -rf "$TMP/$PACKAGE"
+fi
+
+# Download package source
+URL=$(grep "^d" FILE_LIST | awk '{print $8}' | grep $PACKAGE | head -n1 | sed 's/^.\///')
+mkdir "$TMP/$PACKAGE" || exit
+cd "$TMP/$PACKAGE" || exit
+lftp -c "open https://slackware.osuosl.org/slackware64-$BRANCH/source/$URL ; mirror"
+
+# Cleanup
+rm $TMP/FILE_LIST
