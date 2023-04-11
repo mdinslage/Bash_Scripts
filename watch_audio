@@ -1,4 +1,4 @@
 #!/bin/bash
 set -e
-CARD_NUMBER=$(aplay -l | grep "DX3 Pro+" | awk '{print $2}' | tr -d ':')
+CARD_NUMBER=$(aplay -l | grep "DX3 Pro+" | awk '{print $2}' | tr -d ':' | head -n1)
 watch -n1 cat /proc/asound/card$CARD_NUMBER/pcm0p/sub0/hw_params
