@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# XFce in a Slackware qemu guest does not 
-# support auto resize of the guest window
-# this script will enable that feature.
+# XFce does not support auto resize of 
+#the guest window. this script will 
+#enable that feature.
 
 # Check if the user is root
 if [ "$(whoami)" != "root" ]; then
@@ -11,9 +11,28 @@ if [ "$(whoami)" != "root" ]; then
 fi
 
 # Check if the spice-vdagent file exists
-if ! [ -e /var/lib/pkgtools/packages/spice-vdagent* ]; then
-  echo "Please install spice-vdagent first"
-  exit 1
+if [ -f /etc/slackware-version ]; then
+  if ! [ -e /var/lib/pkgtools/packages/spice-vdagent* ]; then
+    echo "Please install spice-vdagent first"
+    exit 1
+  fi
+fi
+
+# Debian family system check
+if [ -f /etc/debian_version ]; then
+  if ! dpkg -s spice-vdagent >/dev/null 2>&1; then
+    echo "Installing spice-vdagent..."
+    apt-get update
+    apt-get install -y spice-vdagent
+  fi
+fi
+
+#RedHat famiy system check
+if [ -f /etc/redhat-release ]; then
+  if ! rpm -q spice-vdagent >/dev/null 2>&1; then
+    echo "Installing spice-vdagent..."
+    yum install -y spice-vdagent
+  fi
 fi
 
 # Create the udev rule file
@@ -32,4 +51,7 @@ chmod +x /usr/local/bin/x-resize
 
 # Reload the udev rules
 udevadm control --reload-rules
+
+echo "Finished, logout or reboot may be required"
+
 
