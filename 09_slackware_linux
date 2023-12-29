@@ -15,8 +15,6 @@ set -e
 #
 # You should have received a copy of the GNU General Public License
 # along with GRUB.  If not, see <http://www.gnu.org/licenses/>.
-#
-# Save this file in /etc/grub.d/09_slackware_linux
 
 prefix="/usr"
 exec_prefix="${prefix}"
@@ -107,7 +105,7 @@ process_list ()
     tag="$2"
     initrd_allowed="$3"
     while [ "x$mylist" != "x" ] ; do
-	linux=`version_find_latest $mylist`
+	linux=$(echo "$mylist" | version_sort -r | head -n 1)
 	echo "Found linux image: $linux" >&2
 	basename=`basename $linux`
 	dirname=`dirname $linux`
@@ -165,4 +163,3 @@ list=`for i in /boot/vmlinu[xz]-huge-* /vmlinu[xz]-huge-* ; do
         if grub_file_is_not_garbage "$i" ; then echo -n "$i " ; fi
       done`
 process_list "${list}" "huge" "false"
-
