@@ -5,7 +5,7 @@ output_file="cpu_frequency.log"
 
 # Function to log CPU frequency
 log_cpu_frequency() {
-    cpufreq-info -c 0 | grep "current CPU frequency" | awk '{print $5}' >> "$output_file"
+    cat /proc/cpuinfo | grep "MHz" | cut -d" " -f3 >> "$output_file"
 }
 
 # Main script
