@@ -100,51 +100,50 @@ EOF
 EOF
 }
 
-
 process_list ()
 {
     mylist="$1"
     tag="$2"
     initrd_allowed="$3"
-    while [ "x$mylist" != "x" ] ; do
-	linux=$(echo "$mylist" | version_sort -r | head -n 1)
-	echo "Found linux image: $linux" >&2
-	basename=`basename $linux`
-	dirname=`dirname $linux`
-	rel_dirname=`make_system_path_relative_to_its_root $dirname`
-	version=`echo $basename | sed -e "s,^[^0-9]*-,,g"`
-	alt_version=`echo $version | sed -e "s,\.old$,,g"`
-	linux_root_device_thisversion="${LINUX_ROOT_DEVICE}"
+    
+    IFS=' ' read -r -a kernels <<< "$mylist"
+    
+    for kernel in "${kernels[@]}"; do
+        echo "Found linux image: $kernel" >&2
+        basename=$(basename "$kernel")
+        dirname=$(dirname "$kernel")
+        rel_dirname=$(make_system_path_relative_to_its_root "$dirname")
+        version=$(echo "$basename" | sed -e "s,^[^0-9]*-,,g")
+        alt_version=$(echo "$version" | sed -e "s,\.old$,,g")
+        linux_root_device_thisversion="${LINUX_ROOT_DEVICE}"
         initrd=
-	if [ "x${initrd_allowed}" = "xtrue" ]; then
-	    for i in "initrd-${version}.gz" "initrd.gz" \
-		"initrd.img-${version}" "initrd-${version}.img" \
-		"initrd-${version}" "initrd.img-${alt_version}" \
-		"initrd-${alt_version}.img" "initrd-${alt_version}"; do
-		if test -e "${dirname}/${i}" ; then
-		    initrd="$i"
-		    break
-		fi
-	    done
-	    if test -n "${initrd}" ; then
-		echo "Found initrd image: ${dirname}/${initrd}" >&2
-	    else
+        if [ "x${initrd_allowed}" = "xtrue" ]; then
+            for i in "initrd-${version}.gz" "initrd.gz" \
+                "initrd.img-${version}" "initrd-${version}.img" \
+                "initrd-${version}" "initrd.img-${alt_version}" \
+                "initrd-${alt_version}.img" "initrd-${alt_version}"; do
+                if test -e "${dirname}/${i}" ; then
+                    initrd="$i"
+                    break
+                fi
+            done
+            if test -n "${initrd}" ; then
+                echo "Found initrd image: ${dirname}/${initrd}" >&2
+            else
                 # "UUID=" magic is parsed by initrds.  Since there's no initrd, it can't work here.
-		linux_root_device_thisversion=${GRUB_DEVICE}
-	    fi
-	else
+                linux_root_device_thisversion=${GRUB_DEVICE}
+            fi
+        else
             # "UUID=" magic is parsed by initrds.  Since there's no initrd, it can't work here.
-	    linux_root_device_thisversion=${GRUB_DEVICE}
-	fi
+            linux_root_device_thisversion=${GRUB_DEVICE}
+        fi
 
-	linux_entry "${OS}" "${tag}" "${version}" false \
-	    "${GRUB_CMDLINE_LINUX} ${GRUB_CMDLINE_LINUX_DEFAULT}"
-	if [ "x${GRUB_DISABLE_RECOVERY}" != "xtrue" ]; then
-	    linux_entry "${OS}" "${tag}" "${version}" true \
-		"single ${GRUB_CMDLINE_LINUX}"
-	fi
-
-	mylist=`echo $mylist | tr ' ' '\n' | grep -vx $linux | tr '\n' ' '`
+        linux_entry "${OS}" "${tag}" "${version}" false \
+            "${GRUB_CMDLINE_LINUX} ${GRUB_CMDLINE_LINUX_DEFAULT}"
+        if [ "x${GRUB_DISABLE_RECOVERY}" != "xtrue" ]; then
+            linux_entry "${OS}" "${tag}" "${version}" true \
+                "single ${GRUB_CMDLINE_LINUX}"
+        fi
     done
 }
 
