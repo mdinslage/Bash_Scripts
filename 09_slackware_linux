@@ -106,25 +106,12 @@ process_list ()
     tag="$2"
     initrd_allowed="$3"
     
-    IFS=' ' read -r -a kernels <<< "$mylist"
+    # Version-sort the kernels
+    sorted_kernels=$(echo "$mylist" | version_sort -r)
     
-    # Separate SMP and non-SMP kernels
-    smp_kernels=()
-    non_smp_kernels=()
+    IFS=' ' read -r -a kernels <<< "$sorted_kernels"
     
     for kernel in "${kernels[@]}"; do
-        basename=$(basename "$kernel")
-        if [[ $basename == *"-smp"* ]]; then
-            smp_kernels+=("$kernel")
-        else
-            non_smp_kernels+=("$kernel")
-        fi
-    done
-    
-    # Combine SMP kernels first, followed by non-SMP kernels
-    sorted_kernels=("${smp_kernels[@]}" "${non_smp_kernels[@]}")
-    
-    for kernel in "${sorted_kernels[@]}"; do
         # Skip symbolic links
         if [ -L "$kernel" ]; then
             continue
