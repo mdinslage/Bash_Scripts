@@ -108,7 +108,28 @@ process_list ()
     
     IFS=' ' read -r -a kernels <<< "$mylist"
     
+    # Separate SMP and non-SMP kernels
+    smp_kernels=()
+    non_smp_kernels=()
+    
     for kernel in "${kernels[@]}"; do
+        basename=$(basename "$kernel")
+        if [[ $basename == *"-smp"* ]]; then
+            smp_kernels+=("$kernel")
+        else
+            non_smp_kernels+=("$kernel")
+        fi
+    done
+    
+    # Combine SMP kernels first, followed by non-SMP kernels
+    sorted_kernels=("${smp_kernels[@]}" "${non_smp_kernels[@]}")
+    
+    for kernel in "${sorted_kernels[@]}"; do
+        # Skip symbolic links
+        if [ -L "$kernel" ]; then
+            continue
+        fi
+        
         echo "Found linux image: $kernel" >&2
         basename=$(basename "$kernel")
         dirname=$(dirname "$kernel")
@@ -164,3 +185,4 @@ list=`for i in /boot/vmlinu[xz]-huge-* /vmlinu[xz]-huge-* ; do
         if grub_file_is_not_garbage "$i" ; then echo -n "$i " ; fi
       done`
 process_list "${list}" "huge" "false"
+
