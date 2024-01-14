@@ -29,22 +29,22 @@ export TEXTDOMAINDIR="${datarootdir}/locale"
 
 CLASS="--class gnu-linux --class gnu --class os"
 
-if [ "x${GRUB_DISTRIBUTOR}" = "x" ] ; then
+if [ "${GRUB_DISTRIBUTOR}" = "" ] ; then
   OS=GNU/Linux
 else
   OS="${GRUB_DISTRIBUTOR} GNU/Linux"
-  CLASS="--class $(echo ${GRUB_DISTRIBUTOR} | tr '[A-Z]' '[a-z]') ${CLASS}"
+  CLASS="--class $(echo "${GRUB_DISTRIBUTOR}" | tr '[:upper:]' '[:lower:]') ${CLASS}"
 fi
 
 # loop-AES arranges things so that /dev/loop/X can be our root device, but
 # the initrds that Linux uses don't like that.
 case ${GRUB_DEVICE} in
   /dev/loop/*|/dev/loop[0-9])
-    GRUB_DEVICE=`losetup ${GRUB_DEVICE} | sed -e "s/^[^(]*(\([^)]\+\)).*/\1/"`
+    GRUB_DEVICE=$(losetup "${GRUB_DEVICE}" | sed -e "s/^[^(]*(\([^)]\+\)).*/\1/")
   ;;
 esac
 
-if [ "x${GRUB_DEVICE_UUID}" = "x" ] || [ "x${GRUB_DISABLE_LINUX_UUID}" = "xtrue" ] \
+if [ "${GRUB_DEVICE_UUID}" = "" ] || [ "${GRUB_DISABLE_LINUX_UUID}" = "true" ] \
     || ! test -e "/dev/disk/by-uuid/${GRUB_DEVICE_UUID}" ; then
   LINUX_ROOT_DEVICE=${GRUB_DEVICE}
 else
@@ -68,31 +68,31 @@ linux_entry ()
 
   # Use ELILO's generic "efifb" when it's known to be available.
   # FIXME: We need an interface to select vesafb in case efifb can't be used.
-  if [ "x$GRUB_GFXPAYLOAD_LINUX" = x ]; then
-      if grep -qx "CONFIG_FB_EFI=y" /boot/config-${version} 2> /dev/null \
-	  && grep -qx "CONFIG_VT_HW_CONSOLE_BINDING=y" /boot/config-${version} 2> /dev/null; then
-	  cat << EOF
-	set gfxpayload=keep
+  if [ "$GRUB_GFXPAYLOAD_LINUX" = "" ]; then
+      if grep -qx "CONFIG_FB_EFI=y" /boot/config-"${version}" 2> /dev/null \
+      && grep -qx "CONFIG_VT_HW_CONSOLE_BINDING=y" /boot/config-"${version}" 2> /dev/null; then
+      cat << EOF
+    set gfxpayload=keep
 EOF
       fi
   else
-	  cat << EOF
-	set gfxpayload=$GRUB_GFXPAYLOAD_LINUX
+      cat << EOF
+    set gfxpayload=$GRUB_GFXPAYLOAD_LINUX
 EOF
   fi
 
   if [ -z "${prepare_boot_cache}" ]; then
-    prepare_boot_cache="$(prepare_grub_to_access_device ${GRUB_DEVICE_BOOT} | sed -e "s/^/\t/")"
+    prepare_boot_cache="$(prepare_grub_to_access_device "${GRUB_DEVICE_BOOT}" | sed -e "s/^/\t/")"
   fi
   printf '%s\n' "${prepare_boot_cache}"
   cat << EOF
-	echo	$(printf "$(gettext "Loading Linux %s ...")" ${version})
-	linux	${rel_dirname}/${basename} root=${linux_root_device_thisversion} ro ${args}
+    echo    $(printf "$(gettext "Loading Linux %s ...")" "${version}")
+    linux    ${rel_dirname}/${basename} root=${linux_root_device_thisversion} ro ${args}
 EOF
   if test -n "${initrd}" ; then
     cat << EOF
-	echo	$(gettext "Loading initial ramdisk ...")
-	initrd	${rel_dirname}/${initrd}
+    echo    $(gettext "Loading initial ramdisk ...")
+    initrd    ${rel_dirname}/${initrd}
 EOF
   fi
   cat << EOF
@@ -100,8 +100,7 @@ EOF
 EOF
 }
 
-process_list ()
-{
+process_list() {
     mylist="$1"
     tag="$2"
     initrd_allowed="$3"
@@ -109,95 +108,71 @@ process_list ()
     # Version-sort the kernels
     sorted_kernels=$(echo "$mylist" | version_sort -r)
 
-    # Separate smp and non-smp kernels
-    smp_kernels=()
-    non_smp_kernels=()
+    # Use portable command substitution
+    kernels=$(echo "$sorted_kernels" | tr ' ' '\n')
 
-    IFS=' ' read -r -a kernels <<< "$sorted_kernels"
-
-    for kernel in "${kernels[@]}"; do
-        if [[ $kernel == *"smp"* ]]; then
-            smp_kernels+=("$kernel")
-        else
-            non_smp_kernels+=("$kernel")
+    for kernel in $kernels; do
+        # Skip symbolic links
+        if [ -L "$kernel" ]; then
+            continue
         fi
-    done
 
-    # Process smp kernels first
-    for kernel in "${smp_kernels[@]}"; do
-        process_kernel "$kernel" "$tag" "$initrd_allowed"
-    done
+        printf "Found linux image: %s\n" "$kernel" >&2
+        basename=$(basename "$kernel")
+        dirname=$(dirname "$kernel")
+        rel_dirname=$(make_system_path_relative_to_its_root "$dirname")
+        version=$(echo "$basename" | sed -e "s,^[^0-9]*-,,g")
+        alt_version=$(echo "$version" | sed -e "s,\.old$,,g")
+        linux_root_device_thisversion="${LINUX_ROOT_DEVICE}"
+        initrd=
 
-    # Process non-smp kernels
-    for kernel in "${non_smp_kernels[@]}"; do
-        process_kernel "$kernel" "$tag" "$initrd_allowed"
-    done
-}
+        if [ "${initrd_allowed}" = "true" ]; then
+            for i in "initrd-${version}.gz" "initrd.gz" \
+                "initrd.img-${version}" "initrd-${version}.img" \
+                "initrd-${version}" "initrd.img-${alt_version}" \
+                "initrd-${alt_version}.img" "initrd-${alt_version}"; do
+                if [ -e "${dirname}/${i}" ]; then
+                    initrd="$i"
+                    break
+                fi
+            done
 
-process_kernel ()
-{
-    kernel="$1"
-    tag="$2"
-    initrd_allowed="$3"
-
-    # Skip symbolic links
-    if [ -L "$kernel" ]; then
-        return
-    fi
-
-    echo "Found linux image: $kernel" >&2
-    basename=$(basename "$kernel")
-    dirname=$(dirname "$kernel")
-    rel_dirname=$(make_system_path_relative_to_its_root "$dirname")
-    version=$(echo "$basename" | sed -e "s,^[^0-9]*-,,g")
-    alt_version=$(echo "$version" | sed -e "s,\.old$,,g")
-    linux_root_device_thisversion="${LINUX_ROOT_DEVICE}"
-    initrd=
-    if [ "x${initrd_allowed}" = "xtrue" ]; then
-        for i in "initrd-${version}.gz" "initrd.gz" \
-            "initrd.img-${version}" "initrd-${version}.img" \
-            "initrd-${version}" "initrd.img-${alt_version}" \
-            "initrd-${alt_version}.img" "initrd-${alt_version}"; do
-            if test -e "${dirname}/${i}" ; then
-                initrd="$i"
-                break
+            if [ -n "${initrd}" ]; then
+                printf "Found initrd image: %s/%s\n" "${dirname}" "${initrd}" >&2
+            else
+                # "UUID=" magic is parsed by initrds.  Since there's no initrd, it can't work here.
+                linux_root_device_thisversion=${GRUB_DEVICE}
             fi
-        done
-        if test -n "${initrd}" ; then
-            echo "Found initrd image: ${dirname}/${initrd}" >&2
         else
             # "UUID=" magic is parsed by initrds.  Since there's no initrd, it can't work here.
             linux_root_device_thisversion=${GRUB_DEVICE}
         fi
-    else
-        # "UUID=" magic is parsed by initrds.  Since there's no initrd, it can't work here.
-        linux_root_device_thisversion=${GRUB_DEVICE}
-    fi
 
-    linux_entry "${OS}" "${tag}" "${version}" false \
-        "${GRUB_CMDLINE_LINUX} ${GRUB_CMDLINE_LINUX_DEFAULT}"
-    if [ "x${GRUB_DISABLE_RECOVERY}" != "xtrue" ]; then
-        linux_entry "${OS}" "${tag}" "${version}" true \
-            "single ${GRUB_CMDLINE_LINUX}"
-    fi
+        linux_entry "${OS}" "${tag}" "${version}" false \
+            "${GRUB_CMDLINE_LINUX} ${GRUB_CMDLINE_LINUX_DEFAULT}"
+
+        if [ "x${GRUB_DISABLE_RECOVERY}" != "xtrue" ]; then
+            linux_entry "${OS}" "${tag}" "${version}" true \
+                "single ${GRUB_CMDLINE_LINUX}"
+        fi
+    done
 }
-
 
 prepare_boot_cache=
 
-list=`for i in /boot/vmlinu[xz]-generic-* /vmlinu[xz]-generic-* ; do
-        if grub_file_is_not_garbage "$i" ; then echo -n "$i " ; fi
-      done`
+list=$(for i in /boot/vmlinu[xz]-generic-* /vmlinu[xz]-generic-* ; do
+        if grub_file_is_not_garbage "$i" ; then printf "%s " "$i"; fi
+      done)
 
 process_list "${list}" "generic" "true"
 
-list=`for i in /boot/vmlinu[xz]-custom-* /vmlinu[xz]-custom-* ; do
-        if grub_file_is_not_garbage "$i" ; then echo -n "$i " ; fi
-      done`
+list=$(for i in /boot/vmlinu[xz]-custom-* /vmlinu[xz]-custom-* ; do
+        if grub_file_is_not_garbage "$i" ; then printf "%s " "$i"; fi
+      done)
 process_list "${list}" "custom" "true"
 
-list=`for i in /boot/vmlinu[xz]-huge-* /vmlinu[xz]-huge-* ; do
-        if grub_file_is_not_garbage "$i" ; then echo -n "$i " ; fi
-      done`
+list=$(for i in /boot/vmlinu[xz]-huge-* /vmlinu[xz]-huge-* ; do
+        if grub_file_is_not_garbage "$i" ; then printf "%s " "$i"; fi
+      done)
 process_list "${list}" "huge" "false"
 
