@@ -17,24 +17,37 @@ else [ "$ARCH" = "x86_64" ]
   LIBDIRSUFFIX="64"
 fi
 
-# Ask for Slackware verson
-read -p "Do you want packages for 15.0 or current? " user_input
+# Loop to ask for Slackware version until a valid response is provided
+while true; do
+  read -rp "Do you want packages for 15.0 or current? " user_input
 
-# Check user input and set SLACKVER variable
-if [ "$user_input" == "15.0" ]; then
-    SLACKVER="15.0"
-elif [ "$user_input" == "current" ]; then
-    SLACKVER="current"
-else
-    echo "Not a valid response. Script stopped."
-    exit 1
-fi
-
-rm -rf /tmp/flatpak/
-mkdir -p /tmp/flatpak/$SLACKVER
-cd /tmp/flatpak/$SLACKVER
-
-for i in flatpak appstream bubblewrap libostree xdg-dbus-proxy xdg-desktop-portal-gtk ; do
-  wget -r -np -nd -l1 --accept=*.t?z http://www.slackware.com/~alien/slackbuilds/$i/pkg$LIBDIRSUFFIX/$SLACKVER/
+  # Check user input and set SLACKVER variable
+  if [ "$user_input" == "15.0" ]; then
+      SLACKVER="15.0"
+      break
+  elif [ "$user_input" == "current" ]; then
+      SLACKVER="current"
+      break
+  else
+      echo "Not a valid response. Please enter '15.0' or 'current'."
+  fi
 done
 
+rm -rf /tmp/flatpak/
+mkdir -p /tmp/flatpak/"$SLACKVER"
+cd /tmp/flatpak/"$SLACKVER" || exit
+
+# Array of items for the loop
+packages=(
+  "flatpak"
+  "appstream"
+  "bubblewrap"
+  "libostree"
+  "xdg-dbus-proxy"
+  "xdg-desktop-portal-gtk"
+)
+
+# Loop through the array
+for i in "${packages[@]}"; do
+  wget -r -np -nd -l1 --accept=*.t?z http://www.slackware.com/~alien/slackbuilds/"$i"/pkg$LIBDIRSUFFIX/"$SLACKVER"/
+done
