@@ -13,11 +13,11 @@ if [ "$ARCH" = "i586" ]; then
   LIBDIRSUFFIX=""
 elif [ "$ARCH" = "i686" ]; then
   LIBDIRSUFFIX=""
-else [ "$ARCH" = "x86_64" ]
+else [ "$ARCH" = "x86_64" ] 
   LIBDIRSUFFIX="64"
 fi
 
-# Loop to ask for Slackware version until a valid response is provided
+# Ask for Slackware version
 while true; do
   read -rp "Do you want packages for 15.0 or current? " user_input
 
@@ -37,7 +37,7 @@ rm -rf /tmp/flatpak/
 mkdir -p /tmp/flatpak/"$SLACKVER"
 cd /tmp/flatpak/"$SLACKVER" || exit
 
-# Array of items for the loop
+# Flatpak package and dependencies
 packages=(
   "flatpak"
   "appstream"
@@ -47,7 +47,7 @@ packages=(
   "xdg-desktop-portal-gtk"
 )
 
-# Loop through the array
+# Get the packages
 for i in "${packages[@]}"; do
   wget -r -np -nd -l1 --accept=*.t?z http://www.slackware.com/~alien/slackbuilds/"$i"/pkg$LIBDIRSUFFIX/"$SLACKVER"/
 done
