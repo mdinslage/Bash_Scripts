@@ -68,17 +68,17 @@ linux_entry ()
 
   # Use ELILO's generic "efifb" when it's known to be available.
   # FIXME: We need an interface to select vesafb in case efifb can't be used.
-  if [ "$GRUB_GFXPAYLOAD_LINUX" = "" ]; then
-      if grep -qx "CONFIG_FB_EFI=y" /boot/config-"${version}" 2> /dev/null \
-      && grep -qx "CONFIG_VT_HW_CONSOLE_BINDING=y" /boot/config-"${version}" 2> /dev/null; then
-      cat << EOF
-    set gfxpayload=keep
-EOF
+  if [ "x$GRUB_GFXPAYLOAD_LINUX" = x ]; then
+      echo "	load_video" | sed "s/^/$submenu_indentation/"
+      if grep -qx "CONFIG_FB_EFI=y" "${config}" 2> /dev/null \
+	  && grep -qx "CONFIG_VT_HW_CONSOLE_BINDING=y" "${config}" 2> /dev/null; then
+	  echo "	set gfxpayload=keep" | sed "s/^/$submenu_indentation/"
       fi
   else
-      cat << EOF
-    set gfxpayload=$GRUB_GFXPAYLOAD_LINUX
-EOF
+      if [ "x$GRUB_GFXPAYLOAD_LINUX" != xtext ]; then
+	  echo "	load_video" | sed "s/^/$submenu_indentation/"
+      fi
+      echo "	set gfxpayload=$GRUB_GFXPAYLOAD_LINUX" | sed "s/^/$submenu_indentation/"
   fi
 
   if [ -z "${prepare_boot_cache}" ]; then
