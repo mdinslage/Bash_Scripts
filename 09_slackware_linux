@@ -30,9 +30,9 @@ export TEXTDOMAINDIR="${datarootdir}/locale"
 CLASS="--class gnu-linux --class gnu --class os"
 
 if [ "${GRUB_DISTRIBUTOR}" = "" ] ; then
-  OS=GNU/Linux
+  OS=Linux
 else
-  OS="${GRUB_DISTRIBUTOR} GNU/Linux"
+  OS="${GRUB_DISTRIBUTOR} Linux"
   CLASS="--class $(echo "${GRUB_DISTRIBUTOR}" | tr '[:upper:]' '[:lower:]') ${CLASS}"
 fi
 
@@ -68,17 +68,17 @@ linux_entry ()
 
   # Use ELILO's generic "efifb" when it's known to be available.
   # FIXME: We need an interface to select vesafb in case efifb can't be used.
-  if [ "x$GRUB_GFXPAYLOAD_LINUX" = x ]; then
-      echo "	load_video" | sed "s/^/$submenu_indentation/"
-      if grep -qx "CONFIG_FB_EFI=y" "${config}" 2> /dev/null \
-	  && grep -qx "CONFIG_VT_HW_CONSOLE_BINDING=y" "${config}" 2> /dev/null; then
-	  echo "	set gfxpayload=keep" | sed "s/^/$submenu_indentation/"
+  if [ "$GRUB_GFXPAYLOAD_LINUX" = "" ]; then
+      if grep -qx "CONFIG_FB_EFI=y" /boot/config-"${version}" 2> /dev/null \
+      && grep -qx "CONFIG_VT_HW_CONSOLE_BINDING=y" /boot/config-"${version}" 2> /dev/null; then
+      cat << EOF
+    set gfxpayload=keep
+EOF
       fi
   else
-      if [ "x$GRUB_GFXPAYLOAD_LINUX" != xtext ]; then
-	  echo "	load_video" | sed "s/^/$submenu_indentation/"
-      fi
-      echo "	set gfxpayload=$GRUB_GFXPAYLOAD_LINUX" | sed "s/^/$submenu_indentation/"
+      cat << EOF
+    set gfxpayload=$GRUB_GFXPAYLOAD_LINUX
+EOF
   fi
 
   if [ -z "${prepare_boot_cache}" ]; then
@@ -92,7 +92,7 @@ EOF
   if test -n "${initrd}" ; then
     cat << EOF
     echo    $(gettext "Loading initial ramdisk ...")
-    initrd    ${rel_dirname}/${initrd}
+    initrd  ${initrd}
 EOF
   fi
   cat << EOF
@@ -106,14 +106,15 @@ process_list() {
     initrd_allowed="$3"
 
     # Version-sort the kernels
-    sorted_kernels=$(echo "$mylist" | version_sort -r)
+    sorted_kernels=$(echo "$mylist" | tr ' ' '\n' | version_sort -r)
 
     # Use portable command substitution
     kernels=$(echo "$sorted_kernels" | tr ' ' '\n')
 
     for kernel in $kernels; do
-        # Skip symbolic links
-        if [ -L "$kernel" ]; then
+
+        # Skip symbolic links to kernels if requested:
+        if [ -L "$kernel" -a "$GRUB_DISABLE_KERNEL_SYMLINKS" = "true" ]; then
             continue
         fi
 
@@ -125,21 +126,39 @@ process_list() {
         alt_version=$(echo "$version" | sed -e "s,\.old$,,g")
         linux_root_device_thisversion="${LINUX_ROOT_DEVICE}"
         initrd=
+        actual_initrd=
 
         if [ "${initrd_allowed}" = "true" ]; then
-            for i in "initrd-${version}.gz" "initrd.gz" \
+            for i in ${GRUB_EARLY_INITRD_LINUX_STOCK} \
+                     ${GRUB_EARLY_INITRD_LINUX_CUSTOM}; do
+                if [ -e "${dirname}/${i}" ]; then
+                    if [ -z "$initrd" ]; then
+                        initrd="$rel_dirname/$i"
+                    else
+                        initrd="$initrd $rel_dirname/$i"
+                    fi
+                fi
+            done
+            for i in "initrd-${tag}-${version}.gz" "initrd-${tag}.gz" \
+                "initrd-${version}.gz" "initrd.gz" \
                 "initrd.img-${version}" "initrd-${version}.img" \
                 "initrd-${version}" "initrd.img-${alt_version}" \
                 "initrd-${alt_version}.img" "initrd-${alt_version}"; do
                 if [ -e "${dirname}/${i}" ]; then
-                    initrd="$i"
+                    actual_initrd="true"
+                    if [ -z "$initrd" ]; then
+                        initrd="$rel_dirname/$i"
+                    else
+                        initrd="$initrd $rel_dirname/$i"
+                    fi
                     break
                 fi
             done
 
             if [ -n "${initrd}" ]; then
-                printf "Found initrd image: %s/%s\n" "${dirname}" "${initrd}" >&2
-            else
+                printf "Found initrd image: %s\n" "${initrd}" >&2
+            fi
+            if [ -z "$actual_initrd" ]; then
                 # "UUID=" magic is parsed by initrds.  Since there's no initrd, it can't work here.
                 linux_root_device_thisversion=${GRUB_DEVICE}
             fi
@@ -160,19 +179,18 @@ process_list() {
 
 prepare_boot_cache=
 
-list=$(for i in /boot/vmlinu[xz]-generic-* /vmlinu[xz]-generic-* ; do
+list=$(for i in /boot/vmlinu[xz]-generic-* /boot/vmlinu[xz]-generic /vmlinu[xz]-generic-* ; do
         if grub_file_is_not_garbage "$i" ; then printf "%s " "$i"; fi
       done)
 
 process_list "${list}" "generic" "true"
 
-list=$(for i in /boot/vmlinu[xz]-custom-* /vmlinu[xz]-custom-* ; do
+list=$(for i in /boot/vmlinu[xz]-custom-* /boot/vmlinu[xz]-custom /vmlinu[xz]-custom-* ; do
         if grub_file_is_not_garbage "$i" ; then printf "%s " "$i"; fi
       done)
 process_list "${list}" "custom" "true"
 
-list=$(for i in /boot/vmlinu[xz]-huge-* /vmlinu[xz]-huge-* ; do
+list=$(for i in /boot/vmlinu[xz]-huge-* /boot/vmlinu[xz]-huge /vmlinu[xz]-huge-* ; do
         if grub_file_is_not_garbage "$i" ; then printf "%s " "$i"; fi
       done)
 process_list "${list}" "huge" "false"
-
