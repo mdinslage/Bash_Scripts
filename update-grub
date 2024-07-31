@@ -1,0 +1,37 @@
+#!/bin/sh
+# This is a simple script to update grub from the configuration file.
+# Please note that after upgrading to a new grub version, you should
+# first use "grub-install" to reinstall the bootloader, similar to this:
+# grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=GRUB --recheck
+# or this:
+# grub-install --target=i386-pc --recheck /dev/sdX
+
+set -e
+grub-mkconfig -o /boot/grub/grub.cfg "$@"
+
+echo "Modifying menu entry names"
+
+# Path to your grub configuration file
+GRUB_CFG="/boot/grub/grub.cfg"
+
+# Temporary file to store modified content
+TEMP_FILE=$(mktemp)
+
+# Function to modify the GRUB menu entry names
+modify_grub_menu_name() {
+    sed -e 's/\(Linux [0-9.]*\)-\(huge\)/\1 [huge]/' \
+        -e 's/\(Linux [0-9.]*\)-\(generic\)/\1 [generic]/' \
+        "$GRUB_CFG" > "$TEMP_FILE"
+}
+
+# Apply the modification
+modify_grub_menu_name
+
+# Replace the original grub.cfg with the modified one
+mv "$TEMP_FILE" "$GRUB_CFG"
+
+# Clean up
+rm -f "$TEMP_FILE"
+
+echo "GRUB menu entries updated successfully."
+
