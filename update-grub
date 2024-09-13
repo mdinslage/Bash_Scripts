@@ -19,8 +19,7 @@ TEMP_FILE=$(mktemp)
 
 # Function to modify the GRUB menu entry names
 modify_grub_menu_name() {
-    sed -e 's/\(Linux [0-9.]*\)-\(huge\)/\1 [huge]/' \
-        -e 's/\(Linux [0-9.]*\)-\(generic\)/\1 [generic]/' \
+    sed -e 's/\(Linux [0-9.]*\)-\(generic\)/\1 [generic]/' \
         "$GRUB_CFG" > "$TEMP_FILE"
 }
 
