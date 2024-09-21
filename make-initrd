@@ -1,0 +1,29 @@
+#!/bin/bash
+
+# Get the latest kernel version installed by sorting versions numerically
+KVERSION=$(ls /var/lib/pkgtools/packages/ | grep kernel-source | sort -V | tail -n1 | cut -d- -f3)
+
+# Check if a kernel version was found
+if [[ -z "$KVERSION" ]]; then
+    echo "Error: No kernel-source package found."
+    exit 1
+fi
+
+# Check if dracut is installed
+if ! command -v dracut &> /dev/null; then
+    echo "Error: Dracut is not installed."
+    exit 1
+fi
+
+# Generate the initramfs with dracut
+echo "Generating initramfs for kernel version $KVERSION..."
+dracut --hostonly --force "/boot/initrd-$KVERSION-generic.img"
+
+# Check if dracut was successful
+if [[ $? -eq 0 ]]; then
+    echo "Initramfs generated successfully."
+else
+    echo "Error: Failed to generate initramfs."
+    exit 1
+fi
+
