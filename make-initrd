@@ -17,7 +17,7 @@ fi
 
 # Generate the initramfs with dracut
 echo "Generating initramfs for kernel version $KVERSION..."
-dracut --hostonly --force "/boot/initrd-$KVERSION-generic.img"
+dracut --hostonly --force --kver $KVERSION "/boot/initrd-$KVERSION-generic.img"
 
 # Check if dracut was successful
 if [[ $? -eq 0 ]]; then
