@@ -1,5 +1,7 @@
 #!/bin/bash
 
+cd /tmp
+
 # Handle script interruption
 trap 'echo "Script interrupted."; exit 1' SIGINT
 
