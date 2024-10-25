@@ -1,0 +1,66 @@
+#!/bin/bash
+
+# Handle script interruption
+trap 'echo "Script interrupted."; exit 1' SIGINT
+
+# Slackware source directories
+readonly directories=(
+  "a" "ap" "d" "e" "f" "k" "kde" "l" "n" "t" "tcl" "x" "xap" "xfce" "y"
+)
+
+# URL for source
+readonly base_url="https://slackware.osuosl.org/slackware64-current/source"
+
+# Prompt for the program name
+read -p "Enter the program name to download: " program
+
+# Temporary file to signal if the program is found
+tmpfile=$(mktemp)
+
+# Function to search for the program in a directory
+search_directory() {
+  dir="$1"
+
+  # Check if the program has already been found
+  if [ -s "$tmpfile" ]; then
+    exit 0
+  fi
+
+  echo "Searching in \"$dir/\"..."
+
+  # Check if the directory exists on the remote server and search for the program
+  if lftp -c "open $base_url/$dir && cls -1" 2>/dev/null | grep -qw "$program"; then
+    # Write the directory name to the temporary file
+    echo "$dir" > "$tmpfile"
+
+    echo "Found $program in $dir. Downloading..."
+
+    # Download the program and check if it succeeded
+    if lftp -c "open $base_url/$dir && mirror $program"; then
+      echo "Download completed successfully."
+    else
+      echo "Failed to download $program from $dir."
+      exit 1
+    fi
+  fi
+}
+
+export -f search_directory
+export base_url
+export program
+export tmpfile
+
+# Run searches in parallel using xargs
+printf "%s\n" "${directories[@]}" | xargs -n1 -P15 -I{} bash -c 'search_directory "$@"' _ {}
+
+# Check if the program was found
+if [ -s "$tmpfile" ]; then
+  found_dir=$(cat "$tmpfile")
+  echo "Program '$program' found in directory '$found_dir'."
+else
+  echo "Program '$program' not found in any directory."
+fi
+
+# Clean up the temporary file
+rm -f "$tmpfile"
+
