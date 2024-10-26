@@ -52,8 +52,15 @@ export base_url
 export program
 export tmpfile
 
-# Run searches in parallel using xargs (Removed -n1 to fix the warning)
-printf "%s\n" "${directories[@]}" | xargs -P15 -I{} bash -c 'search_directory "$@"' _ {}
+# Determine the number of CPU cores
+num_cores=$(nproc)
+
+# Adjust the number of parallel processes
+# For I/O-bound tasks, you might use a higher number
+parallel_processes=$((num_cores * 2))
+
+# Run searches in parallel using xargs with dynamic -P value
+printf "%s\n" "${directories[@]}" | xargs -P"$parallel_processes" -I{} bash -c 'search_directory "$@"' _ {}
 
 # Check if the program was found
 if [ -s "$tmpfile" ]; then
@@ -65,3 +72,4 @@ fi
 
 # Clean up the temporary file
 rm -f "$tmpfile"
+
