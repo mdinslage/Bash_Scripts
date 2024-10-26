@@ -52,8 +52,8 @@ export base_url
 export program
 export tmpfile
 
-# Run searches in parallel using xargs
-printf "%s\n" "${directories[@]}" | xargs -n1 -P15 -I{} bash -c 'search_directory "$@"' _ {}
+# Run searches in parallel using xargs (Removed -n1 to fix the warning)
+printf "%s\n" "${directories[@]}" | xargs -P15 -I{} bash -c 'search_directory "$@"' _ {}
 
 # Check if the program was found
 if [ -s "$tmpfile" ]; then
@@ -65,4 +65,3 @@ fi
 
 # Clean up the temporary file
 rm -f "$tmpfile"
-
