@@ -5,7 +5,7 @@ KVERSION=$(find /var/lib/pkgtools/packages/ -type f -name "kernel-generic*" | cu
 
 # Check if a kernel version was found
 if [[ -z "$KVERSION" ]]; then
-    echo "Error: No kernel-source package found."
+    echo "Error: No kernel-generic package found."
     exit 1
 fi
 
