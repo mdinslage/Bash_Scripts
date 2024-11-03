@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Get the latest kernel version installed by sorting versions numerically
-KVERSION=$(ls /var/lib/pkgtools/packages/ | grep kernel-source | sort -V | tail -n1 | cut -d- -f3)
+KVERSION=$(find /var/lib/pkgtools/packages/ -type f -name "kernel-generic*" | cut -d- -f3 | sort -V -r | tail -n1)
 
 # Check if a kernel version was found
 if [[ -z "$KVERSION" ]]; then
@@ -15,22 +15,40 @@ if ! command -v dracut &> /dev/null; then
     exit 1
 fi
 
-# Remove orphaned initrd files if their corresponding kernel is missing
-echo "Checking for orphaned initrd files..."
-for initrd in /boot/initrd-*-generic.img; do
-    # Extract the version from the initrd filename
-    INITRD_VERSION=$(basename "$initrd" | cut -d- -f2)
+# Remove orphaned initrd files using the Slackware method
+ORPHANS_FOUND=false
 
-    # Check if the corresponding kernel exists
-    if [[ ! -f "/boot/vmlinuz-$INITRD_VERSION-generic" ]]; then
-        echo "Orphaned initrd found: $initrd (no matching kernel)"
-        rm -v "$initrd"
+cd /boot
+for initrd in initrd-*.img ; do
+    if [ ! -r "$initrd" ]; then
+        continue
     fi
+    # Skip symlinks; handle them separately later
+    if [ -L "$initrd" ]; then
+        continue
+    fi
+    # Extract the identifying portion of the initrd's filename
+    IDENTIFIER="$(basename "$(echo "$initrd" | cut -f 2- -d -)" .img)"
+    if [ ! -r "vmlinuz-${IDENTIFIER}" ]; then
+        ORPHANS_FOUND=true
+        echo "Removing: $initrd"
+        rm -f "$initrd"
+    fi
+done
+
+if [ "$ORPHANS_FOUND" = "false" ]; then
+    echo "No orphaned initrds found in /boot."
+fi
+
+# Also handle dangling initrd symlinks
+for dangling_symlink in $(find . -name "initrd-*.img" -xtype l) $(find . -name "initrd.gz" -xtype l); do
+    echo "Removing: $dangling_symlink"
+    rm -f "$dangling_symlink"
 done
 
 # Generate the initramfs with dracut
 echo "Generating initramfs for kernel version $KVERSION..."
-dracut --hostonly --force --kver $KVERSION "/boot/initrd-$KVERSION-generic.img"
+dracut --zstd --hostonly --force --kver $KVERSION "/boot/initrd-$KVERSION.img"
 
 # Check if dracut was successful
 if [[ $? -eq 0 ]]; then
