@@ -1,0 +1,60 @@
+#!/bin/bash
+
+
+# This script automatically resizes the VM display when you resize the virt-manager window.
+# It listens for X11 RANDR events and runs `xrandr --auto` to snap the resolution to match.
+# This adds seamless auto-resize support for desktop environments like XFCE and MATE, which 
+# do not natively respond to SPICE display changes. Requires X11 (not Wayland), xrandr, xev, 
+# and spice-vdagent to be installed and running. 
+#
+# Run this script manually first to install any missing dependencies.
+# After that, place it in your PATH (e.g., /usr/local/bin), then add it to your desktop 
+# environment’s startup applications so it runs automatically when you log in.
+
+# Check for xev
+if ! command -v xev >/dev/null 2>&1; then
+  echo "xev is not installed. Attempting to install..."
+
+  if [ -f /etc/debian_version ]; then
+    sudo apt-get update && sudo apt-get install -y x11-utils
+  elif [ -f /etc/redhat-release ]; then
+    sudo dnf install -y xev
+  else
+    echo "Please install 'xev' manually for your distribution."
+    exit 1
+  fi
+fi
+
+# Check for spice-vdagent on Slackware
+if [ -f /etc/slackware-version ]; then
+  if ! ls /var/lib/pkgtools/packages/spice-vdagent* >/dev/null 2>&1; then
+    echo "Error: spice-vdagent is not installed. Please install it first."
+    exit 1
+  fi
+fi
+
+# Install spice-vdagent on Debian-based distros
+if [ -f /etc/debian_version ]; then
+  if ! dpkg -s spice-vdagent >/dev/null 2>&1; then
+    echo "Installing spice-vdagent..."
+    sudo apt-get update && sudo apt-get install -y spice-vdagent
+  fi
+fi
+
+# Install spice-vdagent on Red Hat-based distros
+if [ -f /etc/redhat-release ]; then
+  if ! rpm -q spice-vdagent >/dev/null 2>&1; then
+    echo "Installing spice-vdagent..."
+    sudo dnf install -y spice-vdagent
+  fi
+fi
+
+# Initial resize
+xrandr --output "$(xrandr | awk '/ connected/{print $1; exit}')" --auto
+
+# Watch for display change events and auto-resize
+xev -root -event randr | \
+grep --line-buffered 'XRROutputChangeNotifyEvent' | \
+while read -r _; do
+  xrandr --output "$(xrandr | awk '/ connected/{print $1; exit}')" --auto
+done
