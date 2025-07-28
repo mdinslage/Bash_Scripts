@@ -1,0 +1,41 @@
+#!/bin/bash
+
+# Get current MATE wallpaper path
+WALLPAPER=$(gsettings get org.mate.background picture-filename | sed "s/^'\(.*\)'$/\1/")
+
+# Exit if wallpaper is not found
+if [ ! -f "$WALLPAPER" ]; then
+    echo "❌ Error: Wallpaper file not found at $WALLPAPER"
+    exit 1
+fi
+
+# Set output directory and filenames
+OUTPUT_DIR="$HOME/Pictures"
+mkdir -p "$OUTPUT_DIR"
+
+ZOOMED="$OUTPUT_DIR/zoomed_tmp.png"
+FINAL="$OUTPUT_DIR/zoomed.png"
+
+# Get wallpaper dimensions
+read IMG_WIDTH IMG_HEIGHT <<< $(identify -format "%w %h" "$WALLPAPER")
+
+# Step 1: Resize only if not already 2560x1440
+if [[ "$IMG_WIDTH" -eq 2560 && "$IMG_HEIGHT" -eq 1440 ]]; then
+    echo "✔ Image is already 2560x1440 — skipping resize"
+    cp "$WALLPAPER" "$ZOOMED"
+else
+    echo "ℹ Resizing to 2560x1440..."
+    magick "$WALLPAPER" -resize 2560x1440^ -gravity center -extent 2560x1440 -define png:compression-level=9 "$ZOOMED"
+fi
+
+# Step 2: Apply strong Gaussian blur to rightmost 215 pixels
+magick "$ZOOMED" -region 215x1440+2345+0 -blur 0x24 +region -define png:compression-level=9 "$FINAL"
+
+# Step 3: Clean up intermediate file
+rm -f "$ZOOMED"
+
+# Step 4: Set the final image as the new MATE desktop wallpaper
+gsettings set org.mate.background picture-filename "$FINAL"
+
+echo "✅ New wallpaper applied: $FINAL"
+
