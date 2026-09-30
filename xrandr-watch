@@ -131,6 +131,10 @@ resize_display()
 # Initial resize
 # ------------------------------------------------------------
 
+# Allow Xorg, the desktop environment, and spice-vdagent to
+# finish initializing before attempting the initial resize.
+sleep 3
+
 resize_display
 
 
