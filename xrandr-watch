@@ -1,60 +1,147 @@
 #!/bin/bash
 
-
-# This script automatically resizes the VM display when you resize the virt-manager window.
-# It listens for X11 RANDR events and runs `xrandr --auto` to snap the resolution to match.
-# This adds seamless auto-resize support for desktop environments like XFCE and MATE, which 
-# do not natively respond to SPICE display changes. Requires X11 (not Wayland), xrandr, xev, 
-# and spice-vdagent to be installed and running. 
 #
-# Run this script manually first to install any missing dependencies.
-# After that, place it in your PATH (e.g., /usr/local/bin), then add it to your desktop 
-# environment’s startup applications so it runs automatically when you log in.
+# xrandr-watch
+#
+# Automatically resize an X11 desktop when the virt-manager/SPICE
+# display window is resized.
+#
+# Intended primarily for desktop environments such as XFCE and MATE
+# that do not automatically apply SPICE display-size changes.
+#
+# Requires:
+#   - X11
+#   - xrandr
+#   - xev
+#   - spice-vdagent
+#
+# Add this script to your desktop environment's startup applications.
+#
 
+# ------------------------------------------------------------
+# Check for xrandr
+# ------------------------------------------------------------
+
+if ! command -v xrandr >/dev/null 2>&1; then
+    echo "Error: xrandr is not installed."
+    exit 1
+fi
+
+
+# ------------------------------------------------------------
 # Check for xev
+# ------------------------------------------------------------
+
 if ! command -v xev >/dev/null 2>&1; then
-  echo "xev is not installed. Attempting to install..."
+    echo "xev is not installed. Attempting to install..."
 
-  if [ -f /etc/debian_version ]; then
-    sudo apt-get update && sudo apt-get install -y x11-utils
-  elif [ -f /etc/redhat-release ]; then
-    sudo dnf install -y xev
-  else
-    echo "Please install 'xev' manually for your distribution."
-    exit 1
-  fi
+    if [ -f /etc/debian_version ]; then
+        sudo apt-get update &&
+        sudo apt-get install -y x11-utils
+
+    elif [ -f /etc/redhat-release ]; then
+        sudo dnf install -y xev
+
+    else
+        echo "Error: xev is required."
+        echo "Please install xev manually for your distribution."
+        exit 1
+    fi
 fi
 
-# Check for spice-vdagent on Slackware
+
+# ------------------------------------------------------------
+# Check/install spice-vdagent
+# ------------------------------------------------------------
+
 if [ -f /etc/slackware-version ]; then
-  if ! ls /var/lib/pkgtools/packages/spice-vdagent* >/dev/null 2>&1; then
-    echo "Error: spice-vdagent is not installed. Please install it first."
-    exit 1
-  fi
+
+    if ! ls /var/lib/pkgtools/packages/spice-vdagent-* \
+        >/dev/null 2>&1; then
+
+        echo "Error: spice-vdagent is not installed."
+        echo "Please install spice-vdagent first."
+        exit 1
+    fi
+
+elif [ -f /etc/debian_version ]; then
+
+    if ! dpkg -s spice-vdagent >/dev/null 2>&1; then
+        echo "Installing spice-vdagent..."
+
+        sudo apt-get update &&
+        sudo apt-get install -y spice-vdagent
+    fi
+
+elif [ -f /etc/redhat-release ]; then
+
+    if ! rpm -q spice-vdagent >/dev/null 2>&1; then
+        echo "Installing spice-vdagent..."
+
+        sudo dnf install -y spice-vdagent
+    fi
 fi
 
-# Install spice-vdagent on Debian-based distros
-if [ -f /etc/debian_version ]; then
-  if ! dpkg -s spice-vdagent >/dev/null 2>&1; then
-    echo "Installing spice-vdagent..."
-    sudo apt-get update && sudo apt-get install -y spice-vdagent
-  fi
-fi
 
-# Install spice-vdagent on Red Hat-based distros
-if [ -f /etc/redhat-release ]; then
-  if ! rpm -q spice-vdagent >/dev/null 2>&1; then
-    echo "Installing spice-vdagent..."
-    sudo dnf install -y spice-vdagent
-  fi
-fi
+# ------------------------------------------------------------
+# Find the active display
+# ------------------------------------------------------------
 
+get_output()
+{
+    xrandr |
+        awk '$2 == "connected" { print $1; exit }'
+}
+
+
+# ------------------------------------------------------------
+# Resize display
+# ------------------------------------------------------------
+
+resize_display()
+{
+    local output
+
+    output="$(get_output)"
+
+    if [ -z "$output" ]; then
+        return
+    fi
+
+    #
+    # Give SPICE/virtio-gpu a moment to finish updating the
+    # virtual monitor before asking XRandR to apply the new mode.
+    #
+
+    sleep 0.25
+
+    xrandr --output "$output" --auto >/dev/null 2>&1
+
+    #
+    # Ignore events briefly after changing the mode.  xrandr itself
+    # can generate additional RandR notifications, and immediately
+    # reacting to those events can cause repeated mode changes.
+    #
+
+    sleep 0.50
+}
+
+
+# ------------------------------------------------------------
 # Initial resize
-xrandr --output "$(xrandr | awk '/ connected/{print $1; exit}')" --auto
+# ------------------------------------------------------------
 
-# Watch for display change events and auto-resize
-xev -root -event randr | \
-grep --line-buffered 'XRROutputChangeNotifyEvent' | \
-while read -r _; do
-  xrandr --output "$(xrandr | awk '/ connected/{print $1; exit}')" --auto
-done
+resize_display
+
+
+# ------------------------------------------------------------
+# Watch for RandR display changes
+# ------------------------------------------------------------
+
+xev -root -event randr 2>/dev/null |
+    grep --line-buffered 'XRROutputChangeNotifyEvent' |
+    while read -r _; do
+
+        resize_display
+
+    done
